@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>六何故事老虎機｜雙模式</title>
+  <style>
+    body{margin:0;font-family:system-ui,Arial;background:#0b1020;color:#f0f3fa;line-height:1.5}
+    .wrap{max-width:1000px;margin:auto;padding:20px}
+    h1{margin:0 0 12px;font-size:28px}
+    .subtitle{margin-bottom:20px;color:#a7b0c0}
+    .controls{margin:10px 0;display:flex;flex-wrap:wrap;gap:10px}
+    button{background:#1d2a57;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 12px;cursor:pointer}
+    button:hover{background:#2a3d7d}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}}
+    .card{background:#121932;border:1px solid rgba(255,255,255,.1);padding:12px;border-radius:12px}
+    .window{height:80px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;border-radius:10px;margin:10px 0;font-size:20px;font-weight:bold;overflow:hidden;position:relative}
+    .slotText{transition:transform 0.2s ease;font-size:20px;font-weight:bold}
+    .rolling{animation:roll 0.3s linear infinite}
+    @keyframes roll{0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
+    .result{margin-top:15px;background:#1a2545;padding:10px;border-radius:10px}
+    .badge{margin-left:10px;color:#a7b0c0;font-size:13px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>六何故事老虎機 🎰</h1>
+  <div class="subtitle">選擇模式 → 旋轉 → 獲得時間／人物／地點。簡單模式：日常生活詞彙。創意模式：奇幻元素。</div>
+
+  <div class="controls">
+    <button id="modeSimple">簡單模式</button>
+    <button id="modeCreative">創意模式</button>
+    <button id="spinAll">全部旋轉</button>
+    <button id="stopAll">全部停止</button>
+    <button id="copy">複製結果</button>
+    <span id="status" class="badge">目前：簡單模式</span>
+  </div>
+
+  <div class="grid">
+    <div class="card" data-type="time">
+      <h3>時間</h3>
+      <div class="window"><div class="slotText" id="timeText">—</div></div>
+      <button data-action="spin">旋轉</button>
+      <button data-action="stop">停止</button>
+    </div>
+
+    <div class="card" data-type="who">
+      <h3>人物</h3>
+      <div class="window"><div class="slotText" id="whoText">—</div></div>
+      <button data-action="spin">旋轉</button>
+      <button data-action="stop">停止</button>
+    </div>
+
+    <div class="card" data-type="where">
+      <h3>地點</h3>
+      <div class="window"><div class="slotText" id="whereText">—</div></div>
+      <button data-action="spin">旋轉</button>
+      <button data-action="stop">停止</button>
+    </div>
+  </div>
+
+  <div class="result" id="result">結果：—｜—｜—</div>
+</div>
+
+<script>
+(function(){
+  const simple = {
+    time:["早上","中午","放學後","假日","運動會那天"],
+    who:["小學生","老師","巴士司機","同學","鄰居的狗"],
+    where:["課室","操場","圖書館","校巴","便利店"]
+  }
+  const creative = {
+    time:["時間停止的一秒","夢境清晨","流星雨之夜","百年一次的節日"],
+    who:["會說話的植物","迷路的龍","影子分身","縮小到鉛筆大小的你"],
+    where:["書頁世界","雲端操場","倒轉的城市","鉛筆盒宇宙站"]
+  }
+  let mode="simple";
+  let timers={};
+
+  const els={
+    timeText:document.getElementById('timeText'),
+    whoText:document.getElementById('whoText'),
+    whereText:document.getElementById('whereText'),
+    result:document.getElementById('result'),
+    status:document.getElementById('status')
+  }
+
+  function rand(arr){return arr[Math.floor(Math.random()*arr.length)]}
+  function updateResult(){els.result.textContent=`結果：${els.timeText.textContent}｜${els.whoText.textContent}｜${els.whereText.textContent}`}
+
+  function startSpin(type){
+    stopSpin(type);
+    const el=document.getElementById(type+"Text");
+    el.classList.add("rolling");
+    timers[type]=setInterval(()=>{
+      const bank=(mode==="simple"?simple:creative)[type];
+      el.textContent=rand(bank);
+      updateResult();
+    },100);
+  }
+
+  function stopSpin(type){
+    if(timers[type]){clearInterval(timers[type]);timers[type]=null;}
+    const el=document.getElementById(type+"Text");
+    el.classList.remove("rolling");
+  }
+
+  document.getElementById('spinAll').onclick=()=>['time','who','where'].forEach(startSpin);
+  document.getElementById('stopAll').onclick=()=>['time','who','where'].forEach(stopSpin);
+  document.getElementById('copy').onclick=()=>{navigator.clipboard.writeText(els.result.textContent.replace('結果：',''))}
+
+  document.querySelectorAll('[data-action="spin"]').forEach(btn=>btn.onclick=()=>startSpin(btn.parentElement.dataset.type));
+  document.querySelectorAll('[data-action="stop"]').forEach(btn=>btn.onclick=()=>stopSpin(btn.parentElement.dataset.type));
+
+  document.getElementById('modeSimple').onclick=()=>{mode="simple";els.status.textContent="目前：簡單模式";}
+  document.getElementById('modeCreative').onclick=()=>{mode="creative";els.status.textContent="目前：創意模式";}
+
+  // 初始顯示
+  ['time','who','where'].forEach(type=>{
+    const bank=(mode==="simple"?simple:creative)[type];
+    document.getElementById(type+"Text").textContent=rand(bank);
+  });
+  updateResult();
+})();
+</script>
+</body>
+</html>
