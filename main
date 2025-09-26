@@ -1,128 +1,165 @@
-<!DOCTYPE html>
-<html lang="zh-HK">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>六何故事老虎機｜雙模式</title>
-  <style>
-    body{margin:0;font-family:system-ui,Arial;background:#0b1020;color:#f0f3fa;line-height:1.5}
-    .wrap{max-width:1000px;margin:auto;padding:20px}
-    h1{margin:0 0 12px;font-size:28px}
-    .subtitle{margin-bottom:20px;color:#a7b0c0}
-    .controls{margin:10px 0;display:flex;flex-wrap:wrap;gap:10px}
-    button{background:#1d2a57;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 12px;cursor:pointer}
-    button:hover{background:#2a3d7d}
-    .grid{display:grid;grid-template-columns:1fr;gap:14px}
-    @media(min-width:720px){.grid{grid-template-columns:repeat(3,1fr)}}
-    .card{background:#121932;border:1px solid rgba(255,255,255,.1);padding:12px;border-radius:12px}
-    .window{height:80px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;border-radius:10px;margin:10px 0;font-size:20px;font-weight:bold;overflow:hidden;position:relative}
-    .slotText{transition:transform 0.2s ease;font-size:20px;font-weight:bold}
-    .rolling{animation:roll 0.3s linear infinite}
-    @keyframes roll{0%{transform:translateY(0)}50%{transform:translateY(-10px)}100%{transform:translateY(0)}}
-    .result{margin-top:15px;background:#1a2545;padding:10px;border-radius:10px}
-    .badge{margin-left:10px;color:#a7b0c0;font-size:13px}
-  </style>
-</head>
-<body>
-<div class="wrap">
-  <h1>六何故事老虎機 🎰</h1>
-  <div class="subtitle">選擇模式 → 旋轉 → 獲得時間／人物／地點。簡單模式：日常生活詞彙。創意模式：奇幻元素。</div>
+import React, { useEffect, useRef, useState } from "react";
 
-  <div class="controls">
-    <button id="modeSimple">簡單模式</button>
-    <button id="modeCreative">創意模式</button>
-    <button id="spinAll">全部旋轉</button>
-    <button id="stopAll">全部停止</button>
-    <button id="copy">複製結果</button>
-    <span id="status" class="badge">目前：簡單模式</span>
+// ===== 可調參數 =====
+const DEFAULT_WORDS = {
+  verb: ["跑", "跳", "吃", "穿", "踢", "洗", "刷", "畫", "上", "唱"]
+};
+
+// 動詞對應圖片映射：只存放 Google Drive 檔案 ID
+const IMAGE_ID_MAP = {
+  "刷": "1xfRncOR147OIHi81jrSMDDkvsXRMRZnJ",
+  "洗": "19ntvOb7Lk2cpkqIZZRpQlFzKsYSoMEUK",
+  "唱": "1m1s_C1OkuTGUw62BKCVFiD0AVGaxbARP",
+  "畫": "1Ko70l0RJL5Nz9rOyP7zGo4WpPFoIuIeU",
+  "跳": "1fpAj3DTYsiqpHjtsKsPvgSsVztpc5tnn",
+  "跑": "1TT7r5Zy1jBlj3bmPzr_aFH3K9imYUoz-",
+  "吃": "11kzifNeh7yHxjCjSm8czNsL0iVI2dgYu",
+  "穿": "1m2-vGDLz3IqjFEmDU9tCAa-3iiIHClu4",
+  "踢": "1k8T1Hco0tTkC_Df77fufCHMLIDyYKPHS",
+  "上": "1lu6Hct8pKR7mWLJJlycY9l6s_yAzoPUB"
+};
+const driveSrcFromId = (id) => id ? `https://lh3.googleusercontent.com/d/${id}=s600` : null;
+
+const Reel = ({ items, onDblEdit, spinning, speed, setFinalResult, stopSignal=0, height=220 }) => {
+  const boxRef = useRef(null);
+  const windowRef = useRef(null);
+  const animRef = useRef(0);
+  const posRef = useRef(0);
+  const [running, setRunning] = useState(false);
+
+  const itemGap = 10;
+  const triple = [...items, ...items, ...items];
+
+  useEffect(() => {
+    cancelAnimationFrame(animRef.current);
+    if (spinning) {
+      setRunning(true);
+      const step = () => {
+        posRef.current += speed;
+        const total = (boxRef.current?.scrollHeight || 1) / 3;
+        if (posRef.current >= total) posRef.current = 0;
+        if (boxRef.current) boxRef.current.style.transform = `translateY(-${posRef.current}px)`;
+        animRef.current = requestAnimationFrame(step);
+      };
+      animRef.current = requestAnimationFrame(step);
+    } else {
+      setRunning(false);
+      cancelAnimationFrame(animRef.current);
+    }
+    return () => cancelAnimationFrame(animRef.current);
+  }, [spinning, speed]);
+
+  useEffect(() => {
+    if (!spinning) {
+      stopAlign();
+    }
+  }, [stopSignal]);
+
+  const stopAlign = () => {
+    cancelAnimationFrame(animRef.current);
+    const el = boxRef.current;
+    const wnd = windowRef.current;
+    if (!el || !wnd) return;
+    const firstItem = el.querySelector(".slot-item");
+    if (!firstItem) return;
+    const rect = firstItem.getBoundingClientRect();
+    const itemH = rect.height + itemGap;
+    const windowH = wnd.getBoundingClientRect().height;
+    const centerOffset = (windowH - itemH) / 2;
+
+    const i = Math.round((posRef.current + centerOffset) / itemH);
+    const snap = i * itemH - centerOffset;
+    posRef.current = snap;
+    el.style.transform = `translateY(-${snap}px)`;
+
+    const idx = ((i % items.length) + items.length) % items.length;
+    const resultWord = items[idx];
+    setFinalResult(resultWord);
+    setTimeout(() => window.alert("抽到：" + resultWord), 20);
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow p-3 flex flex-col items-center">
+      <div ref={windowRef} className="relative w-full border-2 border-slate-200 rounded-xl overflow-hidden bg-white" style={{ height }} onDoubleClick={onDblEdit}>
+        <div className="pointer-events-none absolute left-0 right-0 top-1/2 -translate-y-1/2" style={{height: Math.max(48, height/5), background: "rgba(25,118,210,0.12)", outline: "2px dashed rgba(25,118,210,0.35)", borderRadius: 12}} />
+        <div ref={boxRef} className="absolute inset-0 flex flex-col items-center gap-[10px] p-3 will-change-transform">
+          {triple.map((t, i) => (
+            <div key={i} className="slot-item w-full text-center font-extrabold leading-tight select-none" style={{ fontSize: "clamp(28px,6vw,48px)", fontFamily: "DFKai-SB, '標楷體', serif" }}>{t}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SectionCard = ({ title, children }) => (
+  <div className="w-full max-w-[1200px] bg-white/70 backdrop-blur rounded-3xl border border-slate-200 shadow p-6 flex flex-col items-center">
+    <div className="text-2xl md:text-3xl font-bold mb-4 text-center" style={{ fontFamily: "DFKai-SB, '標楷體', serif" }}>{title}</div>
+    {children}
   </div>
+);
 
-  <div class="grid">
-    <div class="card" data-type="time">
-      <h3>時間</h3>
-      <div class="window"><div class="slotText" id="timeText">—</div></div>
-      <button data-action="spin">旋轉</button>
-      <button data-action="stop">停止</button>
+function useEditableWords(initial) {
+  const [words, setWords] = useState(initial);
+  const editList = (key) => {
+    const current = words[key].join("、");
+    const next = window.prompt("用『、』分隔詞語，按確定更新：", current);
+    if (next != null) {
+      const arr = next.split("、").map((s) => s.trim()).filter(Boolean);
+      if (arr.length) setWords((w) => ({ ...w, [key]: arr }));
+    }
+  };
+  return { words, setWords, editList };
+}
+
+const SlotVerb = () => {
+  const { words, editList } = useEditableWords({ verb: DEFAULT_WORDS.verb });
+  const [spins, setSpins] = useState({ verb: false });
+  const [speed, setSpeed] = useState({ verb: 6.0 });
+  const [result, setResult] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [stopTick, setStopTick] = useState(0);
+
+  const start = () => {
+    setResult(null);
+    setSpeed({ verb: 5 + Math.random() * 2 });
+    setSpins({ verb: true });
+    setRunning(true);
+  };
+  const stop = () => {
+    setSpins({ verb: false });
+    setRunning(false);
+    setStopTick((t) => t + 1);
+  };
+
+  return (
+    <SectionCard title="動詞抽選機">
+      <div className="flex gap-6 mb-6 justify-center">
+        <button onClick={start} className="px-6 py-3 rounded-xl text-white bg-blue-600 text-lg" style={{ fontFamily: "DFKai-SB, '標楷體', serif" }}>開始</button>
+        <button onClick={stop} disabled={!running} className="px-6 py-3 rounded-xl text-white disabled:opacity-50 bg-slate-700 text-lg" style={{ fontFamily: "DFKai-SB, '標楷體', serif" }}>停</button>
+      </div>
+      <div className="grid grid-cols-2 gap-6 w-full items-center">
+        <div>
+          <Reel items={words.verb} spinning={spins.verb} speed={speed.verb} stopSignal={stopTick} setFinalResult={setResult} onDblEdit={() => editList("verb")} />
+        </div>
+        <div className="flex flex-col items-center gap-4">
+          {result && IMAGE_ID_MAP[result] && (
+            <img src={driveSrcFromId(IMAGE_ID_MAP[result])} alt={result} className="max-h-64 object-contain" />
+          )}
+          <div className="text-center text-[6rem] md:text-[8rem] font-extrabold text-blue-700 flex justify-center items-center" style={{ fontFamily: "DFKai-SB, '標楷體', serif" }}>
+            <span>{result || "＿"}</span>
+            <span style={{ textDecoration: "underline", marginLeft: "0.05rem" }}>　</span>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
+};
+
+export default function App() {
+  return (
+    <div className="min-h-screen w-full bg-slate-50 px-3 py-6 flex justify-center items-start">
+      <SlotVerb />
     </div>
-
-    <div class="card" data-type="who">
-      <h3>人物</h3>
-      <div class="window"><div class="slotText" id="whoText">—</div></div>
-      <button data-action="spin">旋轉</button>
-      <button data-action="stop">停止</button>
-    </div>
-
-    <div class="card" data-type="where">
-      <h3>地點</h3>
-      <div class="window"><div class="slotText" id="whereText">—</div></div>
-      <button data-action="spin">旋轉</button>
-      <button data-action="stop">停止</button>
-    </div>
-  </div>
-
-  <div class="result" id="result">結果：—｜—｜—</div>
-</div>
-
-<script>
-(function(){
-  const simple = {
-    time:["早上","中午","放學後","假日","運動會那天"],
-    who:["小學生","老師","巴士司機","同學","鄰居的狗"],
-    where:["課室","操場","圖書館","校巴","便利店"]
-  }
-  const creative = {
-    time:["時間停止的一秒","夢境清晨","流星雨之夜","百年一次的節日"],
-    who:["會說話的植物","迷路的龍","影子分身","縮小到鉛筆大小的你"],
-    where:["書頁世界","雲端操場","倒轉的城市","鉛筆盒宇宙站"]
-  }
-  let mode="simple";
-  let timers={};
-
-  const els={
-    timeText:document.getElementById('timeText'),
-    whoText:document.getElementById('whoText'),
-    whereText:document.getElementById('whereText'),
-    result:document.getElementById('result'),
-    status:document.getElementById('status')
-  }
-
-  function rand(arr){return arr[Math.floor(Math.random()*arr.length)]}
-  function updateResult(){els.result.textContent=`結果：${els.timeText.textContent}｜${els.whoText.textContent}｜${els.whereText.textContent}`}
-
-  function startSpin(type){
-    stopSpin(type);
-    const el=document.getElementById(type+"Text");
-    el.classList.add("rolling");
-    timers[type]=setInterval(()=>{
-      const bank=(mode==="simple"?simple:creative)[type];
-      el.textContent=rand(bank);
-      updateResult();
-    },100);
-  }
-
-  function stopSpin(type){
-    if(timers[type]){clearInterval(timers[type]);timers[type]=null;}
-    const el=document.getElementById(type+"Text");
-    el.classList.remove("rolling");
-  }
-
-  document.getElementById('spinAll').onclick=()=>['time','who','where'].forEach(startSpin);
-  document.getElementById('stopAll').onclick=()=>['time','who','where'].forEach(stopSpin);
-  document.getElementById('copy').onclick=()=>{navigator.clipboard.writeText(els.result.textContent.replace('結果：',''))}
-
-  document.querySelectorAll('[data-action="spin"]').forEach(btn=>btn.onclick=()=>startSpin(btn.parentElement.dataset.type));
-  document.querySelectorAll('[data-action="stop"]').forEach(btn=>btn.onclick=()=>stopSpin(btn.parentElement.dataset.type));
-
-  document.getElementById('modeSimple').onclick=()=>{mode="simple";els.status.textContent="目前：簡單模式";}
-  document.getElementById('modeCreative').onclick=()=>{mode="creative";els.status.textContent="目前：創意模式";}
-
-  // 初始顯示
-  ['time','who','where'].forEach(type=>{
-    const bank=(mode==="simple"?simple:creative)[type];
-    document.getElementById(type+"Text").textContent=rand(bank);
-  });
-  updateResult();
-})();
-</script>
-</body>
-</html>
+  );
+}
